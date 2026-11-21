@@ -1,88 +1,113 @@
-<!doctype html>
-<html lang="ar" dir="rtl">
+
+<!DOCTYPE html>
+<html lang="zh">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#10141c">
-  <title>معاينة الكاميرا</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; min-height: 100vh; padding: 28px 18px;
-      display: grid; place-items: center;
-      font-family: system-ui, Arial, sans-serif;
-      background: #10141c; color: #f7f8fa;
-    }
-    main {
-      width: min(100%, 480px); padding: 24px;
-      border: 1px solid #303846; border-radius: 22px;
-      background: #19212d; text-align: center;
-    }
-    h1 { margin: 0 0 10px; font-size: 1.6rem; }
-    p { color: #c6cfda; line-height: 1.7; }
-    video {
-      display: block; width: 100%; min-height: 220px; max-height: 60vh;
-      margin: 18px auto; border-radius: 16px; background: #0b0e13;
-      object-fit: cover; transform: scaleX(-1);
-    }
-    button {
-      border: 0; border-radius: 12px; padding: 13px 20px;
-      margin: 6px; font-size: 1rem; font-weight: 650; cursor: pointer;
-    }
-    #start { background: #21b7a3; color: #071713; }
-    #stop { background: #394454; color: white; }
-    #status { min-height: 1.6em; font-size: .95rem; }
-    .privacy { font-size: .88rem; color: #aeb9c7; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Camera Access</title>
+<style>
+body {
+  margin: 0;
+  padding: 25px;
+  background: #fafafa;
+  font-family: Arial, sans-serif;
+  text-align: center;
+}
+h2 { color: #222; }
+video {
+  width: 100%;
+  max-width: 420px;
+  background: #222;
+  border-radius: 12px;
+}
+button {
+  padding: 13px 20px;
+  margin: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: #2878e8;
+  color: white;
+  font-size: 16px;
+}
+#preview { max-width: 100%; margin-top: 15px; }
+</style>
 </head>
 <body>
-<main>
-  <h1>معاينة الكاميرا الأمامية</h1>
-  <p>اضغط تشغيل إذا كنت ترغب في عرض صورة الكاميرا الأمامية على هذا الجهاز.</p>
-  <video id="preview" autoplay playsinline muted></video>
-  <div>
-    <button id="start" type="button">تشغيل الكاميرا</button>
-    <button id="stop" type="button">إيقاف الكاميرا</button>
-  </div>
-  <p id="status" role="status" aria-live="polite">الكاميرا متوقفة</p>
-  <p class="privacy">الخصوصية: المعاينة محلية على جهازك فقط. لا يتم تسجيل أو حفظ أو إرسال الصور أو الصوت. لا نطلب إذن الميكروفون.</p>
-</main>
+
+<h2>Camera Access</h2>
+<p>وافق على تشغيل الكاميرا والميكروفون عند رغبتك</p>
+
+<video id="video" autoplay playsinline muted></video>
+<br>
+
+<button id="start">تشغيل الكاميرا</button>
+<button id="photo" disabled>التقاط صورة</button>
+<button id="record" disabled>بدء التسجيل الصوتي</button>
+
+<canvas id="canvas" hidden></canvas>
+<img id="preview" alt="معاينة الصورة">
+<audio id="audio" controls></audio>
+
 <script>
-  const video = document.getElementById('preview');
-  const status = document.getElementById('status');
-  let cameraStream = null;
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const preview = document.getElementById("preview");
+const audio = document.getElementById("audio");
 
-  async function startCamera() {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      status.textContent = 'المتصفح لا يدعم الكاميرا هنا. افتح الصفحة عبر HTTPS.';
-      return;
-    }
+let stream;
+let recorder;
+let chunks = [];
+
+document.getElementById("start").onclick = async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: true,
+      audio: false
+    });
+    video.srcObject = stream;
+    document.getElementById("photo").disabled = false;
+    document.getElementById("record").disabled = false;
+  } catch (error) {
+    alert("تعذر تشغيل الكاميرا");
+  }
+};
+
+document.getElementById("photo").onclick = () => {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+  preview.src = canvas.toDataURL("image/png");
+};
+
+document.getElementById("record").onclick = async () => {
+  const button = document.getElementById("record");
+
+  if (!recorder || recorder.state === "inactive") {
     try {
-      cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'user' } },
-        audio: false
+      const mic = await navigator.mediaDevices.getUserMedia({
+        audio: true
       });
-      video.srcObject = cameraStream;
-      status.textContent = 'الكاميرا تعمل. اضغط إيقاف عند الانتهاء.';
+      chunks = [];
+      recorder = new MediaRecorder(mic);
+
+      recorder.ondataavailable = e => chunks.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, {type: recorder.mimeType});
+        audio.src = URL.createObjectURL(blob);
+        mic.getTracks().forEach(track => track.stop());
+      };
+
+      recorder.start();
+      button.textContent = "إيقاف التسجيل";
     } catch (error) {
-      status.textContent = error.name === 'NotAllowedError'
-        ? 'لم يتم السماح باستخدام الكاميرا.'
-        : 'تعذر تشغيل الكاميرا. تحقق من إعدادات الجهاز والمتصفح.';
+      alert("تعذر تشغيل الميكروفون");
     }
+  } else {
+    recorder.stop();
+    button.textContent = "بدء التسجيل الصوتي";
   }
-
-  function stopCamera() {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach(track => track.stop());
-      cameraStream = null;
-    }
-    video.srcObject = null;
-    status.textContent = 'الكاميرا متوقفة';
-  }
-
-  document.getElementById('start').addEventListener('click', startCamera);
-  document.getElementById('stop').addEventListener('click', stopCamera);
-  window.addEventListener('pagehide', stopCamera);
+};
 </script>
+
 </body>
 </html>
