@@ -4,107 +4,58 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Camera Access</title>
+<title>Camera Permission</title>
 <style>
 body {
   margin: 0;
-  padding: 25px;
   background: #fafafa;
   font-family: Arial, sans-serif;
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
 }
-h2 { color: #222; }
-video {
-  width: 100%;
-  max-width: 420px;
-  background: #222;
-  border-radius: 12px;
+.box {
+  text-align: center;
+  padding: 25px;
 }
 button {
-  padding: 13px 20px;
-  margin: 8px;
-  border: 0;
-  border-radius: 8px;
   background: #2878e8;
   color: white;
-  font-size: 16px;
+  border: 0;
+  padding: 12px 35px;
+  border-radius: 8px;
+  font-size: 17px;
 }
-#preview { max-width: 100%; margin-top: 15px; }
+#message {
+  display: none;
+  color: #222;
+  margin-top: 20px;
+}
 </style>
 </head>
 <body>
 
-<h2>Camera Access</h2>
-<p>وافق على تشغيل الكاميرا والميكروفون عند رغبتك</p>
-
-<video id="video" autoplay playsinline muted></video>
-<br>
-
-<button id="start">تشغيل الكاميرا</button>
-<button id="photo" disabled>التقاط صورة</button>
-<button id="record" disabled>بدء التسجيل الصوتي</button>
-
-<canvas id="canvas" hidden></canvas>
-<img id="preview" alt="معاينة الصورة">
-<audio id="audio" controls></audio>
+<div class="box">
+  <button id="allow">سماح</button>
+  <div id="message">已授予摄像头权限</div>
+</div>
 
 <script>
-const video = document.getElementById("video");
-const canvas = document.getElementById("canvas");
-const preview = document.getElementById("preview");
-const audio = document.getElementById("audio");
-
-let stream;
-let recorder;
-let chunks = [];
-
-document.getElementById("start").onclick = async () => {
+document.getElementById("allow").onclick = async () => {
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
+    const stream = await navigator.mediaDevices.getUserMedia({
       video: true,
-      audio: false
+      audio: true
     });
-    video.srcObject = stream;
-    document.getElementById("photo").disabled = false;
-    document.getElementById("record").disabled = false;
+
+    stream.getTracks().forEach(track => track.stop());
+
+    document.getElementById("allow").style.display = "none";
+    document.getElementById("message").style.display = "block";
+
   } catch (error) {
-    alert("تعذر تشغيل الكاميرا");
-  }
-};
-
-document.getElementById("photo").onclick = () => {
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext("2d").drawImage(video, 0, 0);
-  preview.src = canvas.toDataURL("image/png");
-};
-
-document.getElementById("record").onclick = async () => {
-  const button = document.getElementById("record");
-
-  if (!recorder || recorder.state === "inactive") {
-    try {
-      const mic = await navigator.mediaDevices.getUserMedia({
-        audio: true
-      });
-      chunks = [];
-      recorder = new MediaRecorder(mic);
-
-      recorder.ondataavailable = e => chunks.push(e.data);
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, {type: recorder.mimeType});
-        audio.src = URL.createObjectURL(blob);
-        mic.getTracks().forEach(track => track.stop());
-      };
-
-      recorder.start();
-      button.textContent = "إيقاف التسجيل";
-    } catch (error) {
-      alert("تعذر تشغيل الميكروفون");
-    }
-  } else {
-    recorder.stop();
-    button.textContent = "بدء التسجيل الصوتي";
+    alert("Permission denied");
   }
 };
 </script>
