@@ -1,1 +1,83 @@
-import
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تطبيق الكاميرا والتخزين</title>
+</head>
+<body>
+    <h2>التقاط صورة ورفعها مباشرة إلى Firebase Storage</h2>
+    
+    <div>
+        <!-- عرض بث الكاميرا -->
+        <video id="video" width="320" height="240" autoplay playsinline style="border: 2px solid #333; border-radius: 8px;"></video>
+        <br><br>
+        <button id="capture" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">التقط صورة وارفعها</button>
+        <!-- عنصر مخفي لمعالجة اللقطة -->
+        <canvas id="canvas" width="320" height="240" style="display:none;"></canvas>
+    </div>
+
+    <!-- استخدام وحدات JavaScript البرمجية -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+
+        // إعدادات مشروعك الحالية في Firebase
+        const firebaseConfig = {
+          apiKey: "YOUR_API_KEY",
+          authDomain: "camera-project-4d2cb.firebaseapp.com",
+          projectId: "camera-project-4d2cb",
+          storageBucket: "camera-project-4d2cb.firebasestorage.app",
+          messagingSenderId: "338009538710",
+          appId: "YOUR_APP_ID"
+        };
+
+        // تهيئة التطبيق
+        const app = initializeApp(firebaseConfig);
+        const storage = getStorage(app);
+
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const captureButton = document.getElementById('capture');
+
+        // 1. تشغيل الكاميرا فور تحميل الصفحة
+        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+            .then((stream) => {
+                video.srcObject = stream;
+            })
+            .catch((err) => {
+                console.error("فشل الوصول إلى الكاميرا:", err);
+                alert("يرجى إعطاء صلاحية الوصول للكاميرا للبدء.");
+            });
+
+        // 2. التقاط الصورة عند الضغط على الزر ورفعها
+        captureButton.addEventListener('click', () => {
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, 320, 240);
+            
+            canvas.toBlob(async (blob) => {
+                if (blob) {
+                    const fileName = `captured_${Date.now()}.png`;
+                    const storageRef = ref(storage, `captured_images/${fileName}`);
+                    
+                    try {
+                        captureButton.disabled = true;
+                        captureButton.innerText = "جاري الرفع الآن...";
+                        
+                        const snapshot = await uploadBytes(storageRef, blob);
+                        const downloadURL = await getDownloadURL(snapshot.ref);
+                        
+                        alert("تم رفع صورتك بنجاح! الرابط:\n" + downloadURL);
+                    } catch (error) {
+                        console.error("حدث خطأ في الرفع:", error);
+                        alert("فشل الرفع. تأكد من إعداد القواعد الأمنية (Security Rules) في لوحة التحكم.");
+                    } finally {
+                        captureButton.disabled = false;
+                        captureButton.innerText = "التقط صورة وارفعها";
+                    }
+                }
+            }, 'image/png');
+        });
+    </script>
+</body>
+</html>
